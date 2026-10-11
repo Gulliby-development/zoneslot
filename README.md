@@ -27,6 +27,8 @@ Open the address that Vite prints. To serve a production build, run `bun run bui
 
 The grid shows one UTC day: 24 columns, `00` to `23` UTC, with one row per zone. Each cell shows the local time of that UTC hour in that zone (`HH:MM`, so Kolkata at 13 UTC shows `18:30`). Cells inside the zone's working hours are marked as working; columns where every valid zone is working are highlighted, and a summary line states the shared hours.
 
+A `+1d` or `-1d` marker beneath a time means its local calendar date is one day after or before the UTC date, respectively. The legend below the grid explains the markers. For example, `Asia/Kolkata` at 20 UTC reads `01:30` with a `+1d` marker.
+
 The state lives in the URL hash, so a plan can be shared as a link. For example, Berlin and New York, both working 09:00-17:00, on 2026-03-10:
 
 ```text

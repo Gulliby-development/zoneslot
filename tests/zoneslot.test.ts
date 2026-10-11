@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AddZoneForm } from "../src/AddZoneForm";
 import { App } from "../src/App";
 import { formatHash, parseHash } from "../src/hash";
-import { findOverlap, isWorking } from "../src/overlap";
+import { dayOffset, findOverlap, isWorking } from "../src/overlap";
 import {
   addZone,
   defaultState,
@@ -42,6 +42,16 @@ function renderedCells(date: string, zone: string, from: number, to: number) {
 }
 
 describe("Intl time and overlap calculations", () => {
+  test("compares local and UTC calendar-day offsets", () => {
+    expect(dayOffset("Asia/Kolkata", new Date("2026-03-10T20:00:00Z"))).toBe(1);
+    expect(dayOffset("Europe/Berlin", new Date("2026-03-10T23:00:00Z"))).toBe(1);
+    expect(dayOffset("Europe/Berlin", new Date("2026-03-10T12:00:00Z"))).toBe(0);
+    expect(dayOffset("America/New_York", new Date("2026-03-10T02:00:00Z"))).toBe(-1);
+    expect(dayOffset("Pacific/Honolulu", new Date("2026-03-10T09:00:00Z"))).toBe(-1);
+    expect(dayOffset("Pacific/Kiritimati", new Date("2026-03-10T10:00:00Z"))).toBe(1);
+    expect(dayOffset("Pacific/Kiritimati", new Date("2026-03-10T09:00:00Z"))).toBe(0);
+  });
+
   test("converts specified offsets, DST transitions, and fractional offsets", () => {
     expect(isWorking("Europe/Berlin", instant("2026-03-10", 13), 9, 17)).toBe(true);
     expect(isWorking("America/New_York", instant("2026-03-10", 13), 9, 17)).toBe(true);
@@ -253,6 +263,38 @@ describe("server-rendered components", () => {
     expect(markup).toContain('data-state="off"');
   });
 
+  test("marks local dates relative to UTC and conditionally renders the legend", () => {
+    const render = (hash: string) =>
+      renderToStaticMarkup(createElement(App, { now: fixedNow, initialHash: hash }));
+    const count = (markup: string, marker: string) =>
+      markup.split(`data-day="${marker}"`).length - 1;
+
+    const berlin = render("#d=2026-03-10&z=Europe/Berlin@9-17");
+    expect(count(berlin, "+1")).toBe(1);
+    expect(count(berlin, "-1")).toBe(0);
+    expect(berlin).toContain('data-day="+1">00:00</td>');
+
+    const newYork = render("#d=2026-03-10&z=America/New_York@9-17");
+    expect(count(newYork, "-1")).toBe(4);
+    expect(count(newYork, "+1")).toBe(0);
+    const kolkata = render("#d=2026-03-10&z=Asia/Kolkata@9-17");
+    expect(count(kolkata, "+1")).toBe(5);
+    expect(count(kolkata, "-1")).toBe(0);
+    const kolkataCells = renderedCells("2026-03-10", "Asia/Kolkata", 9, 17);
+    for (const cell of kolkataCells.slice(0, 19)) {
+      expect(cell.attributes).not.toContain("data-day");
+    }
+    expect(kolkataCells[18]).toMatchObject({ text: "23:30" });
+    for (const cell of kolkataCells.slice(19)) {
+      expect(cell.attributes).toContain('data-day="+1"');
+    }
+    expect(kolkataCells.slice(19)).toHaveLength(5);
+    expect(kolkata).toContain('class="hours-grid__off" data-day="+1">01:30</td>');
+    expect(berlin).toContain("grid-legend");
+    expect(berlin).toContain("+1d and -1d mark a local date after or before the UTC date.");
+    expect(render("#d=2026-03-10")).not.toContain("grid-legend");
+  });
+
   test("falls back on invalid hashes and excludes invalid ranges from overlap", () => {
     const invalidHashMarkup = renderToStaticMarkup(
       createElement(App, { now: fixedNow, initialHash: "#d=2026-02-30" }),
@@ -276,7 +318,40 @@ describe("server-rendered components", () => {
 });
 
 describe("project documentation and license", () => {
-  test("documents required commands and examples", () => {
+  test("constrains the grid layout and styles date markers", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+    const rule = (selector: string) => {
+      const expectedSelector = selector.replaceAll("\\n", "\n").replace(/\s+/g, " ").trim();
+      const block = styles.split("}").find((candidate) => {
+        const [candidateSelector] = candidate.split("{");
+        return candidateSelector.replace(/\s+/g, " ").trim() === expectedSelector;
+      });
+      return block?.slice(block.indexOf("{") + 1) ?? "";
+    };
+
+    expect(rule(".hours-grid th,\\n.hours-grid td")).toContain("padding: 12px 3px;");
+    const gridMinWidth = Number(rule(".hours-grid").split("min-width:")[1]?.trim().split("px")[0]);
+    expect(gridMinWidth).toBeLessThanOrEqual(1100);
+    expect(rule(".hours-grid td")).toContain("font-size: 0.7rem;");
+    expect(rule(".hours-grid thead th")).toContain("font-size: 0.7rem;");
+    const zoneHeader = rule(".hours-grid thead th:first-child,\\n.hours-grid tbody th");
+    expect(zoneHeader).toContain("min-width: 150px;");
+    expect(zoneHeader).toContain("width: 150px;");
+    expect(zoneHeader).toContain("max-width: 150px;");
+    expect(zoneHeader).toContain("white-space: normal;");
+    expect(zoneHeader).toContain("overflow-wrap: anywhere;");
+    expect(zoneHeader).toContain("padding-left: 8px;");
+    expect(zoneHeader).toContain("padding-right: 8px;");
+    expect(rule(".grid-scroll")).toContain("overflow-x: auto;");
+    expect(rule(".hours-grid td[data-day]::after")).toContain('content: attr(data-day) "d";');
+    expect(rule(".hours-grid td[data-day]::after")).toContain("display: block;");
+    expect(rule(".hours-grid td[data-day]::after")).toContain("font-size: 0.6rem;");
+    expect(rule(".hours-grid td[data-day]::after")).toContain("line-height: 1;");
+    expect(rule(".grid-legend")).toContain("color: var(--muted);");
+    expect(rule(".grid-legend")).toContain("margin: 8px 0 0;");
+  });
+
+  test("documents required commands, date markers, and examples", () => {
     const readme = readFileSync("README.md", "utf8");
     for (const required of [
       "bun run dev",
@@ -285,6 +360,10 @@ describe("project documentation and license", () => {
       "bun run build",
       "#d=2026-03-10&z=Europe/Berlin@9-17,America/New_York@9-17",
       "All 2 zones overlap: 13:00-16:00 UTC",
+      "`+1d` or `-1d` marker",
+      "The legend below the grid explains the markers.",
+      "`Asia/Kolkata` at 20 UTC reads `01:30` with a `+1d` marker.",
+      "Asia/Calcutta",
     ]) {
       expect(readme).toContain(required);
     }

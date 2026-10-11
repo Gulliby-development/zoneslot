@@ -204,7 +204,7 @@ h1 {
 
 .hours-grid {
   width: 100%;
-  min-width: 1160px;
+  min-width: 1100px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.8rem;
@@ -218,7 +218,7 @@ h1 {
 
 .hours-grid th,
 .hours-grid td {
-  padding: 12px 8px;
+  padding: 12px 3px;
   border-top: 1px solid var(--line);
   border-right: 1px solid #edf1ee;
   text-align: center;
@@ -231,7 +231,7 @@ h1 {
   background: #f7f9f7;
   color: #606d65;
   font-family: "DM Mono", monospace;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 500;
 }
 
@@ -240,7 +240,13 @@ h1 {
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 175px;
+  min-width: 150px;
+  width: 150px;
+  max-width: 150px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding-left: 8px;
+  padding-right: 8px;
   background: #fff;
   text-align: left;
 }
@@ -258,7 +264,20 @@ h1 {
 .hours-grid td {
   color: #839088;
   font-family: "DM Mono", monospace;
-  font-size: 0.73rem;
+  font-size: 0.7rem;
+}
+
+.hours-grid td[data-day]::after {
+  content: attr(data-day) "d";
+  display: block;
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.grid-legend {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .hours-grid td.hours-grid__work {
