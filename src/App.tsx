@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AddZoneForm } from "./AddZoneForm";
 import { formatHash, parseHash } from "./hash";
-import { findOverlap, isWorking } from "./overlap";
+import { dayOffset, findOverlap, isWorking } from "./overlap";
 import { addZone, defaultState, type PlannerState, removeZone, setDate, setRange } from "./state";
 import { ZoneRow } from "./ZoneRow";
 
@@ -134,12 +134,14 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
                 {Array.from({ length: 24 }, (_, hour) => {
                   const instant = utcDateAtHour(state.date, hour);
                   const working = isWorking(zone, instant, from, to);
+                  const offset = dayOffset(zone, instant);
                   return (
                     <td
                       key={formatHour(hour)}
                       data-state={working ? "work" : "off"}
                       data-overlap={overlappingHours.has(hour) ? "true" : "false"}
                       className={working ? "hours-grid__work" : "hours-grid__off"}
+                      data-day={offset === 0 ? undefined : offset > 0 ? "+1" : "-1"}
                     >
                       {formatLocalTime(zone, instant)}
                     </td>
@@ -150,6 +152,9 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
           </tbody>
         </table>
       </div>
+      {state.zones.length > 0 && (
+        <p className="grid-legend">+1d and -1d mark a local date after or before the UTC date.</p>
+      )}
     </main>
   );
 }

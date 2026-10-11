@@ -13,6 +13,26 @@ function dateAtUtcHour(dateISO: string, hour: number): Date {
   return new Date(`${dateISO}T${String(hour).padStart(2, "0")}:00:00.000Z`);
 }
 
+/** Returns the local calendar date's offset from the instant's UTC date. */
+export function dayOffset(zone: string, instant: Date): -1 | 0 | 1 {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(instant);
+  const partValue = (type: "year" | "month" | "day"): number =>
+    Number(parts.find((part) => part.type === type)?.value);
+  const localDate = [partValue("year"), partValue("month"), partValue("day")];
+  const utcDate = [instant.getUTCFullYear(), instant.getUTCMonth() + 1, instant.getUTCDate()];
+
+  for (let index = 0; index < localDate.length; index += 1) {
+    if (localDate[index] < utcDate[index]) return -1;
+    if (localDate[index] > utcDate[index]) return 1;
+  }
+  return 0;
+}
+
 function localMinutes(zone: string, instant: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: zone,
