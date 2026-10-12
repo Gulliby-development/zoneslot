@@ -45,6 +45,41 @@ function localMinutes(zone: string, instant: Date): number {
   return hour * 60 + minute;
 }
 
+/** Formats shared UTC ranges as local clock times for each valid working zone. */
+export function localRanges(
+  zones: WorkingZone[],
+  dateISO: string,
+  ranges: [number, number][],
+): { zone: string; text: string }[] {
+  if (ranges.length === 0) return [];
+
+  const utcDate = Date.parse(`${dateISO}T00:00:00.000Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateISO) ||
+    !Number.isFinite(utcDate) ||
+    new Date(utcDate).toISOString().slice(0, 10) !== dateISO
+  ) {
+    throw new RangeError(`Invalid date: ${dateISO}`);
+  }
+
+  const formatEndpoint = (zone: string, hour: number): string => {
+    const instant = new Date(utcDate + hour * 3600000);
+    const minutes = localMinutes(zone, instant);
+    const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    const offset = dayOffset(zone, instant);
+    return `${time}${offset === 0 ? "" : ` ${offset > 0 ? "+" : "-"}1d`}`;
+  };
+
+  return zones
+    .filter(({ from, to }) => from < to)
+    .map(({ zone }) => ({
+      zone,
+      text: ranges
+        .map(([start, end]) => `${formatEndpoint(zone, start)}-${formatEndpoint(zone, end)}`)
+        .join(", "),
+    }));
+}
+
 /** Returns whether an instant falls within the zone's local working-hour interval. */
 export function isWorking(zone: string, utcDate: Date, from: number, to: number): boolean {
   if (from >= to) return false;

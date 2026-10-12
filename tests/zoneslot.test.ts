@@ -5,9 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AddZoneForm } from "../src/AddZoneForm";
 import { App } from "../src/App";
 import { formatHash, parseHash } from "../src/hash";
-import { dayOffset, findOverlap, isWorking } from "../src/overlap";
+import { dayOffset, findOverlap, isWorking, localRanges } from "../src/overlap";
 import {
   addZone,
+  canonicalZone,
   defaultState,
   type PlannerState,
   removeZone,
@@ -155,6 +156,74 @@ describe("Intl time and overlap calculations", () => {
     });
     expect(findOverlap([], "2026-03-10")).toEqual({ hours: [], ranges: [] });
   });
+
+  test("formats shared ranges in each zone in input order", () => {
+    expect(
+      localRanges(
+        [
+          { zone: "Europe/Berlin", from: 9, to: 17 },
+          { zone: "America/New_York", from: 9, to: 17 },
+        ],
+        "2026-03-10",
+        [[13, 16]],
+      ),
+    ).toEqual([
+      { zone: "Europe/Berlin", text: "14:00-17:00" },
+      { zone: "America/New_York", text: "09:00-12:00" },
+    ]);
+    const kolkata = canonicalZone("Asia/Kolkata");
+    if (kolkata === null) throw new Error("Asia/Kolkata must be a supported time zone");
+    expect(
+      localRanges(
+        [
+          { zone: "Europe/London", from: 9, to: 17 },
+          { zone: kolkata, from: 9, to: 17 },
+        ],
+        "2026-01-15",
+        [[9, 12]],
+      ),
+    ).toEqual([
+      { zone: "Europe/London", text: "09:00-12:00" },
+      { zone: kolkata, text: "14:30-17:30" },
+    ]);
+  });
+
+  test("formats day markers and UTC hour 24 correctly", () => {
+    const auckland = [{ zone: "Pacific/Auckland", from: 9, to: 17 }];
+    expect(localRanges(auckland, "2026-01-15", [[20, 24]])[0].text).toBe("09:00 +1d-13:00");
+    expect(localRanges(auckland, "2026-01-15", [[0, 4]])[0].text).toBe("13:00-17:00");
+    expect(
+      localRanges(auckland, "2026-01-15", [
+        [0, 4],
+        [20, 24],
+      ])[0].text,
+    ).toBe("13:00-17:00, 09:00 +1d-13:00");
+    expect(
+      localRanges([{ zone: "Asia/Kolkata", from: 9, to: 17 }], "2026-01-15", [[20, 24]]),
+    ).toEqual([{ zone: "Asia/Kolkata", text: "01:30 +1d-05:30" }]);
+    expect(localRanges([{ zone: "UTC", from: 9, to: 17 }], "2026-01-15", [[0, 24]])).toEqual([
+      { zone: "UTC", text: "00:00-00:00" },
+    ]);
+  });
+
+  test("omits invalid working intervals and handles empty ranges and invalid dates", () => {
+    expect(
+      localRanges(
+        [
+          { zone: "UTC", from: 17, to: 9 },
+          { zone: "Europe/Berlin", from: 9, to: 17 },
+          { zone: "America/New_York", from: 10, to: 10 },
+        ],
+        "2026-03-10",
+        [[13, 16]],
+      ),
+    ).toEqual([{ zone: "Europe/Berlin", text: "14:00-17:00" }]);
+    expect(localRanges([{ zone: "UTC", from: 9, to: 17 }], "not-a-date", [])).toEqual([]);
+    expect(() => localRanges([{ zone: "UTC", from: 9, to: 17 }], "2026-02-30", [[0, 1]])).toThrow(
+      RangeError,
+    );
+    expect(localRanges([{ zone: "UTC", from: 9, to: 17 }], "0000-01-01", [[0, 1]])).toHaveLength(1);
+  });
 });
 
 describe("planner state", () => {
@@ -263,6 +332,25 @@ describe("server-rendered components", () => {
     expect(markup).toContain('data-state="off"');
   });
 
+  test("renders local-time ranges after the summary only when hours overlap", () => {
+    const render = (hash: string) =>
+      renderToStaticMarkup(createElement(App, { now: fixedNow, initialHash: hash }));
+    const withOverlap = render(sampleHash);
+    const list = withOverlap.match(/<ul class="local-ranges"[\s\S]*?<\/ul>/)?.[0];
+
+    expect(list).toBe(
+      '<ul class="local-ranges" aria-label="Shared hours in local time" data-testid="local-ranges">' +
+        '<li data-zone="Europe/Berlin">Europe/Berlin: 14:00-17:00</li>' +
+        '<li data-zone="America/New_York">America/New_York: 09:00-12:00</li></ul>',
+    );
+    expect(withOverlap.indexOf('<ul class="local-ranges"')).toBeGreaterThan(
+      withOverlap.indexOf("</p>"),
+    );
+
+    const withoutOverlap = render("#d=2026-03-10&z=Europe/Berlin@9-17,Asia/Tokyo@9-17");
+    expect(withoutOverlap).not.toContain('data-testid="local-ranges"');
+  });
+
   test("marks local dates relative to UTC and conditionally renders the legend", () => {
     const render = (hash: string) =>
       renderToStaticMarkup(createElement(App, { now: fixedNow, initialHash: hash }));
@@ -364,6 +452,9 @@ describe("project documentation and license", () => {
       "The legend below the grid explains the markers.",
       "`Asia/Kolkata` at 20 UTC reads `01:30` with a `+1d` marker.",
       "Asia/Calcutta",
+      "### Local-time ranges",
+      "Europe/Berlin: 14:00-17:00",
+      "America/New_York: 09:00-12:00",
     ]) {
       expect(readme).toContain(required);
     }
