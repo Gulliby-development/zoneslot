@@ -57,6 +57,15 @@ Stored time zone names are the browser's canonical names, as reported by `Intl`.
 
 The summary reads `All N zones overlap: HH:00-HH:00 UTC` (several ranges are joined with `, `), `No common working hours on <date> (UTC)`, or `Add a zone to begin`.
 
+### Local-time ranges
+
+When zones share working hours, a list under the summary shows each shared range in each zone's local time. For the Berlin and New York example above on 2026-03-10, it reads:
+
+```text
+Europe/Berlin: 14:00-17:00
+America/New_York: 09:00-12:00
+```
+
 ## Development
 
 ```sh

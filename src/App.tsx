@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AddZoneForm } from "./AddZoneForm";
 import { formatHash, parseHash } from "./hash";
-import { dayOffset, findOverlap, isWorking } from "./overlap";
+import { dayOffset, findOverlap, isWorking, localRanges } from "./overlap";
 import { addZone, defaultState, type PlannerState, removeZone, setDate, setRange } from "./state";
 import { ZoneRow } from "./ZoneRow";
 
@@ -109,6 +109,17 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
       <p className="summary" data-testid="summary" aria-live="polite">
         {summary}
       </p>
+      {overlap.ranges.length > 0 && (
+        <ul
+          className="local-ranges"
+          aria-label="Shared hours in local time"
+          data-testid="local-ranges"
+        >
+          {localRanges(state.zones, state.date, overlap.ranges).map(({ zone, text }) => (
+            <li key={zone} data-zone={zone}>{`${zone}: ${text}`}</li>
+          ))}
+        </ul>
+      )}
 
       <div className="grid-scroll">
         <table className="hours-grid">
