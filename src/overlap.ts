@@ -81,21 +81,40 @@ export function localRanges(
 }
 
 /** Returns whether an instant falls within the zone's local working-hour interval. */
-export function isWorking(zone: string, utcDate: Date, from: number, to: number): boolean {
+export function isWorking(
+  zone: string,
+  utcDate: Date,
+  from: number,
+  to: number,
+  skipWeekends = false,
+): boolean {
   if (from >= to) return false;
+  if (skipWeekends) {
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      weekday: "short",
+    }).format(utcDate);
+    if (weekday === "Sat" || weekday === "Sun") return false;
+  }
   const minutes = localMinutes(zone, utcDate);
   return minutes >= from * 60 && minutes < to * 60;
 }
 
 /** Finds UTC hours when every row with a valid working interval is working. */
-export function findOverlap(zones: WorkingZone[], dateISO: string): OverlapResult {
+export function findOverlap(
+  zones: WorkingZone[],
+  dateISO: string,
+  skipWeekends = false,
+): OverlapResult {
   const validZones = zones.filter(({ from, to }) => from < to);
   if (validZones.length === 0) return { hours: [], ranges: [] };
 
   const hours: number[] = [];
   for (let hour = 0; hour < 24; hour += 1) {
     const instant = dateAtUtcHour(dateISO, hour);
-    if (validZones.every(({ zone, from, to }) => isWorking(zone, instant, from, to))) {
+    if (
+      validZones.every(({ zone, from, to }) => isWorking(zone, instant, from, to, skipWeekends))
+    ) {
       hours.push(hour);
     }
   }

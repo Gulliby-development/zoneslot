@@ -5,6 +5,7 @@ import { canonicalZone, isValidDate } from "./state";
 export interface ParsedHash {
   date?: string;
   zones: WorkingZone[];
+  skipWeekends?: boolean;
 }
 
 export function parseHash(hash: string): ParsedHash | null {
@@ -16,12 +17,14 @@ export function parseHash(hash: string): ParsedHash | null {
     const separator = part.indexOf("=");
     if (separator <= 0) return null;
     const key = part.slice(0, separator);
-    if ((key !== "d" && key !== "z") || params.has(key)) return null;
+    if ((key !== "d" && key !== "w" && key !== "z") || params.has(key)) return null;
     params.set(key, part.slice(separator + 1));
   }
 
   const date = params.get("d");
   if (date !== undefined && !isValidDate(date)) return null;
+  const weekendValue = params.get("w");
+  if (weekendValue !== undefined && weekendValue !== "0" && weekendValue !== "1") return null;
 
   const zonesText = params.get("z");
   const zones: WorkingZone[] = [];
@@ -50,10 +53,15 @@ export function parseHash(hash: string): ParsedHash | null {
     }
   }
 
-  return { ...(date === undefined ? {} : { date }), zones };
+  return {
+    ...(date === undefined ? {} : { date }),
+    ...(weekendValue === "1" ? { skipWeekends: true } : {}),
+    zones,
+  };
 }
 
 export function formatHash(state: PlannerState): string {
   const zones = state.zones.map(({ zone, from, to }) => `${zone}@${from}-${to}`).join(",");
-  return `#d=${state.date}${zones ? `&z=${zones}` : ""}`;
+  const weekend = state.skipWeekends === true ? "&w=1" : "";
+  return `#d=${state.date}${weekend}${zones ? `&z=${zones}` : ""}`;
 }

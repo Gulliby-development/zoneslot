@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { AddZoneForm } from "./AddZoneForm";
 import { formatHash, parseHash } from "./hash";
 import { dayOffset, findOverlap, isWorking, localRanges } from "./overlap";
-import { addZone, defaultState, type PlannerState, removeZone, setDate, setRange } from "./state";
+import {
+  addZone,
+  defaultState,
+  type PlannerState,
+  removeZone,
+  setDate,
+  setRange,
+  setSkipWeekends,
+} from "./state";
 import { ZoneRow } from "./ZoneRow";
 
 export interface AppProps {
@@ -14,7 +22,13 @@ export interface AppProps {
 function initialState(now: () => Date, hash: string): PlannerState {
   const fallback = defaultState(now());
   const parsed = parseHash(hash);
-  return parsed ? { date: parsed.date ?? fallback.date, zones: parsed.zones } : fallback;
+  return parsed
+    ? {
+        date: parsed.date ?? fallback.date,
+        zones: parsed.zones,
+        ...(parsed.skipWeekends === true ? { skipWeekends: true } : {}),
+      }
+    : fallback;
 }
 
 function utcDateAtHour(date: string, hour: number): Date {
@@ -50,7 +64,7 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
   }, [state]);
 
   const validZones = state.zones.filter(({ from, to }) => from < to);
-  const overlap = findOverlap(validZones, state.date);
+  const overlap = findOverlap(validZones, state.date, state.skipWeekends === true);
   const overlappingHours = new Set(overlap.hours);
 
   let summary = "Add a zone to begin";
@@ -86,6 +100,17 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
           />
         </label>
       </header>
+
+      <label className="weekend-control">
+        <input
+          type="checkbox"
+          checked={state.skipWeekends === true}
+          onChange={(event) =>
+            setState((current) => setSkipWeekends(current, event.target.checked))
+          }
+        />
+        <span>Skip weekends</span>
+      </label>
 
       <section className="zones" aria-label="Planning zones">
         <AddZoneForm error={error} onAdd={handleAdd} />
@@ -144,7 +169,7 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
                 <th scope="row">{zone}</th>
                 {Array.from({ length: 24 }, (_, hour) => {
                   const instant = utcDateAtHour(state.date, hour);
-                  const working = isWorking(zone, instant, from, to);
+                  const working = isWorking(zone, instant, from, to, state.skipWeekends === true);
                   const offset = dayOffset(zone, instant);
                   return (
                     <td
