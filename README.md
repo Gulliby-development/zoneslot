@@ -41,7 +41,7 @@ The summary for that hash is:
 All 2 zones overlap: 13:00-16:00 UTC
 ```
 
-Hash format: `#d=<YYYY-MM-DD>&z=<zone>@<from>-<to>,<zone>@<from>-<to>`. `from` is 0-23 and `to` is 1-24 (exclusive end). A missing `d` uses the current UTC date and a missing `z` means no zones. An invalid hash (unknown or duplicate zone, more than 8 zones, a bad date or hours out of range) is ignored and the default state is shown.
+Hash format: `#d=<YYYY-MM-DD>&w=1&z=<zone>@<from>-<to>,<zone>@<from>-<to>`, with `d`, `w`, and `z` in that order. `from` is 0-23 and `to` is 1-24 (exclusive end). `w=1` skips weekends; `w=0` or a missing `w` does not. A missing `d` uses the current UTC date and a missing `z` means no zones. An invalid hash (unknown or duplicate zone, more than 8 zones, a bad date or hours out of range) is ignored and the default state is shown.
 
 Stored time zone names are the browser's canonical names, as reported by `Intl`. A zone you type as `europe/berlin` is stored as `Europe/Berlin`, and depending on the browser's ICU data a name such as `Asia/Kolkata` may appear as `Asia/Calcutta`.
 
@@ -53,6 +53,7 @@ Stored time zone names are the browser's canonical names, as reported by `Intl`.
 | Add a time zone | An IANA zone name accepted by `Intl`, for example `Europe/Berlin`. Errors: `Unknown time zone: <text>`, `Zone already added`, `At most 8 zones`. |
 | From | Start of working hours in the zone's local time, 0-23 (default 9). |
 | To | End of working hours, 1-24, exclusive (default 17). If From is not before To the row shows `Start must be before end` and is ignored in the overlap. |
+| Skip weekends | When checked, Saturday and Sunday (in each zone's local calendar) are not working days. Off by default. |
 | Remove | Removes the zone from the list. |
 
 The summary reads `All N zones overlap: HH:00-HH:00 UTC` (several ranges are joined with `, `), `No common working hours on <date> (UTC)`, or `Add a zone to begin`.
@@ -65,6 +66,22 @@ When zones share working hours, a list under the summary shows each shared range
 Europe/Berlin: 14:00-17:00
 America/New_York: 09:00-12:00
 ```
+
+### Skip weekends
+
+With Skip weekends on, an hour counts as working in a zone only when the zone's local date for that hour is Monday to Friday.
+
+```text
+#d=2026-03-14&w=1&z=Asia/Tokyo@9-17,America/New_York@19-24
+```
+
+The summary for that hash is:
+
+```text
+No common working hours on 2026-03-14 (UTC)
+```
+
+Without `w=1`, the same zones give `All 2 zones overlap: 00:00-04:00 UTC`.
 
 ## Development
 

@@ -14,6 +14,7 @@ import {
   removeZone,
   setDate,
   setRange,
+  setSkipWeekends,
 } from "../src/state";
 
 const sampleHash = "#d=2026-03-10&z=Europe/Berlin@9-17,America/New_York@9-17";
@@ -80,6 +81,21 @@ describe("Intl time and overlap calculations", () => {
     expect(local("Asia/Kolkata", "2026-03-10", 11)).toBe("16:30");
     expect(local("Asia/Kolkata", "2026-03-10", 12)).toBe("17:30");
     expect(local("Asia/Kathmandu", "2026-03-10", 0)).toBe("05:45");
+  });
+
+  test("skips weekends using each zone's local weekday", () => {
+    const cases: [string, boolean][] = [
+      ["2026-03-13T20:00:00Z", false],
+      ["2026-03-14T20:00:00Z", false],
+      ["2026-03-15T20:00:00Z", true],
+      ["2026-03-16T20:00:00Z", true],
+    ];
+
+    for (const [timestamp, expectedWithSkip] of cases) {
+      const date = new Date(timestamp);
+      expect(isWorking("Pacific/Auckland", date, 9, 17)).toBe(true);
+      expect(isWorking("Pacific/Auckland", date, 9, 17, true)).toBe(expectedWithSkip);
+    }
   });
 
   test("production rendering and work checks cover DST and fractional-offset cells", () => {
@@ -155,6 +171,26 @@ describe("Intl time and overlap calculations", () => {
       ranges: [],
     });
     expect(findOverlap([], "2026-03-10")).toEqual({ hours: [], ranges: [] });
+  });
+
+  test("applies weekend skipping to overlap by each zone's local weekday", () => {
+    const zones = [
+      { zone: "Asia/Tokyo", from: 9, to: 17 },
+      { zone: "America/New_York", from: 19, to: 24 },
+    ];
+    const dates: [string, [number, number][]][] = [
+      ["2026-03-12", [[0, 4]]],
+      ["2026-03-13", [[0, 4]]],
+      ["2026-03-14", []],
+      ["2026-03-15", []],
+      ["2026-03-16", []],
+      ["2026-03-17", [[0, 4]]],
+    ];
+
+    for (const [date, expectedWithSkip] of dates) {
+      expect(findOverlap(zones, date).ranges).toEqual([[0, 4]]);
+      expect(findOverlap(zones, date, true).ranges).toEqual(expectedWithSkip);
+    }
   });
 
   test("formats shared ranges in each zone in input order", () => {
@@ -269,6 +305,28 @@ describe("planner state", () => {
     expect(setDate(updated, "2026-02-30")).toBe(updated);
     expect(setDate(updated, updated.date)).toBe(updated);
   });
+
+  test("toggles weekend state immutably and preserves identity when unchanged", () => {
+    const state: PlannerState = {
+      date: "2026-03-10",
+      zones: [{ zone: "Asia/Tokyo", from: 9, to: 17 }],
+    };
+
+    expect(setSkipWeekends(state, false)).toBe(state);
+    const enabled = setSkipWeekends(state, true);
+    expect(enabled).not.toBe(state);
+    expect(enabled).toEqual({ ...state, skipWeekends: true });
+    expect(state).toEqual({ date: "2026-03-10", zones: [{ zone: "Asia/Tokyo", from: 9, to: 17 }] });
+    expect(setSkipWeekends(enabled, true)).toBe(enabled);
+
+    const disabled = setSkipWeekends(enabled, false);
+    expect(disabled).toEqual({ date: state.date, zones: state.zones });
+    expect(Object.hasOwn(disabled, "skipWeekends")).toBe(false);
+    expect(enabled).toEqual({ ...state, skipWeekends: true });
+
+    const explicitlyDisabled: PlannerState = { ...state, skipWeekends: false };
+    expect(setSkipWeekends(explicitlyDisabled, false)).toBe(explicitlyDisabled);
+  });
 });
 
 describe("shareable URL hashes", () => {
@@ -287,6 +345,21 @@ describe("shareable URL hashes", () => {
     expect(formatHash({ date: "2026-03-10", zones: [] })).toBe("#d=2026-03-10");
   });
 
+  test("round-trips the weekend option and writes it between date and zones", () => {
+    const weekendState: PlannerState = {
+      date: "2026-03-10",
+      zones: [],
+      skipWeekends: true,
+    };
+    expect(parseHash("#w=1")).toEqual({ skipWeekends: true, zones: [] });
+    expect(parseHash("#w=0")).toEqual({ zones: [] });
+    expect(parseHash(formatHash(weekendState))).toEqual(weekendState);
+    expect(formatHash(weekendState)).toBe("#d=2026-03-10&w=1");
+    expect(formatHash({ ...weekendState, zones: [{ zone: "Asia/Tokyo", from: 9, to: 17 }] })).toBe(
+      "#d=2026-03-10&w=1&z=Asia/Tokyo@9-17",
+    );
+  });
+
   test("rejects every malformed or disallowed hash case", () => {
     const nineZones = Array.from(
       { length: 9 },
@@ -302,6 +375,9 @@ describe("shareable URL hashes", () => {
       "#garbage",
       "#d=2026-03-10&d=2026-03-11",
       "#d=2026-03-10&x=1",
+      "#w=2",
+      "#w=",
+      "#d=2026-03-10&w=1&w=1",
       "#z=",
       "#z=Europe/Berlin@9-17,",
     ]) {
@@ -349,6 +425,43 @@ describe("server-rendered components", () => {
 
     const withoutOverlap = render("#d=2026-03-10&z=Europe/Berlin@9-17,Asia/Tokyo@9-17");
     expect(withoutOverlap).not.toContain('data-testid="local-ranges"');
+  });
+
+  test("renders weekend skipping in the checkbox, cells, overlap and local ranges", () => {
+    const render = (hash: string) =>
+      renderToStaticMarkup(createElement(App, { now: fixedNow, initialHash: hash }));
+    const date = "2026-03-14";
+    const zones = "z=Asia/Tokyo@9-17,America/New_York@19-24";
+    const unchecked = render(`#d=${date}&${zones}`);
+    const checked = render(`#d=${date}&w=1&${zones}`);
+    const checkboxOff =
+      '<label class="weekend-control"><input type="checkbox"/><span>Skip weekends</span></label>';
+    const checkboxOn =
+      '<label class="weekend-control"><input type="checkbox" checked=""/><span>Skip weekends</span></label>';
+    const row = (markup: string, zone: string) =>
+      markup.match(new RegExp(`<tr><th scope="row">${zone}</th>(.*?)</tr>`))?.[1] ?? "";
+    const workingCells = (markup: string, zone: string) =>
+      row(markup, zone).match(/data-state="work"/g)?.length ?? 0;
+
+    expect(unchecked).toContain(checkboxOff);
+    expect(checked).toContain(checkboxOn);
+    expect(unchecked).toContain("All 2 zones overlap: 00:00-04:00 UTC");
+    expect(workingCells(unchecked, "Asia/Tokyo")).toBe(8);
+    expect(workingCells(unchecked, "America/New_York")).toBe(5);
+    expect(unchecked.match(/<th(?=[^>]*data-overlap="true")[^>]*>/g) ?? []).toHaveLength(4);
+
+    expect(checked).toContain("No common working hours on 2026-03-14 (UTC)");
+    expect(workingCells(checked, "Asia/Tokyo")).toBe(0);
+    expect(workingCells(checked, "America/New_York")).toBe(4);
+    expect(checked.match(/<th(?=[^>]*data-overlap="true")[^>]*>/g) ?? []).toHaveLength(0);
+    expect(checked).not.toContain('data-testid="local-ranges"');
+
+    const weekday = render(`#d=2026-03-17&w=1&${zones}`);
+    expect(weekday).toContain("All 2 zones overlap: 00:00-04:00 UTC");
+    expect(workingCells(weekday, "Asia/Tokyo")).toBe(8);
+    expect(workingCells(weekday, "America/New_York")).toBe(5);
+    expect(weekday).toContain("Asia/Tokyo: 09:00-13:00");
+    expect(weekday).toContain("America/New_York: 20:00 -1d-00:00");
   });
 
   test("marks local dates relative to UTC and conditionally renders the legend", () => {
@@ -455,6 +568,9 @@ describe("project documentation and license", () => {
       "### Local-time ranges",
       "Europe/Berlin: 14:00-17:00",
       "America/New_York: 09:00-12:00",
+      "### Skip weekends",
+      "#d=2026-03-14&w=1&z=Asia/Tokyo@9-17,America/New_York@19-24",
+      "No common working hours on 2026-03-14 (UTC)",
     ]) {
       expect(readme).toContain(required);
     }

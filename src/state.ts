@@ -3,6 +3,7 @@ import type { WorkingZone } from "./overlap";
 export interface PlannerState {
   date: string;
   zones: WorkingZone[];
+  skipWeekends?: boolean;
 }
 
 export interface AddZoneResult {
@@ -63,4 +64,10 @@ export function setRange(
 
 export function setDate(state: PlannerState, date: string): PlannerState {
   return isValidDate(date) && state.date !== date ? { ...state, date } : state;
+}
+
+export function setSkipWeekends(state: PlannerState, value: boolean): PlannerState {
+  if ((state.skipWeekends === true) === value) return state;
+  if (value) return { ...state, skipWeekends: true };
+  return { date: state.date, zones: state.zones };
 }
