@@ -50,7 +50,7 @@ Stored time zone names are the browser's canonical names, as reported by `Intl`.
 | Option | Description |
 |---|---|
 | Date | The UTC day shown in the grid. Defaults to today (UTC). |
-| Add a time zone | An IANA zone name accepted by `Intl`, for example `Europe/Berlin`. Errors: `Unknown time zone: <text>`, `Zone already added`, `At most 8 zones`. |
+| Add a time zone | An IANA zone name accepted by `Intl`, for example `Europe/Berlin`. Spaces around the name are ignored. Errors: `Enter a time zone name, for example Europe/Berlin` (empty entry), `Unknown time zone: <text> (try a name like Europe/Berlin)`, `Zone already added`, `At most 8 zones`. |
 | From | Start of working hours in the zone's local time, 0-23 (default 9). |
 | To | End of working hours, 1-24, exclusive (default 17). If From is not before To the row shows `Start must be before end` and is ignored in the overlap. |
 | Skip weekends | When checked, Saturday and Sunday (in each zone's local calendar) are not working days. Off by default. |

@@ -30,8 +30,17 @@ export function defaultState(now: Date): PlannerState {
 }
 
 export function addZone(state: PlannerState, text: string): AddZoneResult {
-  const zone = canonicalZone(text);
-  if (!zone) return { state, error: `Unknown time zone: ${text}` };
+  const trimmedText = text.trim();
+  if (!trimmedText) {
+    return { state, error: "Enter a time zone name, for example Europe/Berlin" };
+  }
+  const zone = canonicalZone(trimmedText);
+  if (!zone) {
+    return {
+      state,
+      error: `Unknown time zone: ${trimmedText} (try a name like Europe/Berlin)`,
+    };
+  }
   if (state.zones.some((item) => item.zone === zone)) {
     return { state, error: "Zone already added" };
   }

@@ -282,7 +282,7 @@ describe("planner state", () => {
     });
     expect(addZone(empty, "Not/AZone")).toEqual({
       state: empty,
-      error: "Unknown time zone: Not/AZone",
+      error: "Unknown time zone: Not/AZone (try a name like Europe/Berlin)",
     });
 
     const full: PlannerState = {
