@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AddZoneForm } from "./AddZoneForm";
 import { formatHash, parseHash } from "./hash";
-import { dayOffset, findOverlap, isWorking, localRanges } from "./overlap";
+import { dayOffset, findOverlap, isWorking, localRanges, utcOffset } from "./overlap";
 import {
   addZone,
   defaultState,
@@ -166,7 +166,10 @@ export function App({ now, initialHash, onHashChange }: AppProps) {
           <tbody>
             {state.zones.map(({ zone, from, to }) => (
               <tr key={zone}>
-                <th scope="row">{zone}</th>
+                <th scope="row">
+                  {zone}
+                  <span className="zone-offset">{utcOffset(zone, state.date)}</span>
+                </th>
                 {Array.from({ length: 24 }, (_, hour) => {
                   const instant = utcDateAtHour(state.date, hour);
                   const working = isWorking(zone, instant, from, to, state.skipWeekends === true);

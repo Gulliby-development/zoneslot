@@ -1,3 +1,5 @@
+import { isValidDate } from "./state";
+
 export interface WorkingZone {
   zone: string;
   from: number;
@@ -43,6 +45,21 @@ function localMinutes(zone: string, instant: Date): number {
   const hour = Number(parts.find((part) => part.type === "hour")?.value);
   const minute = Number(parts.find((part) => part.type === "minute")?.value);
   return hour * 60 + minute;
+}
+
+/** Returns the zone's UTC offset at 12:00 UTC on the supplied date. */
+export function utcOffset(zone: string, dateISO: string): string {
+  if (!isValidDate(dateISO)) throw new RangeError(`Invalid date: ${dateISO}`);
+
+  const instant = dateAtUtcHour(dateISO, 12);
+  const minutes = localMinutes(zone, instant) + dayOffset(zone, instant) * 1440 - 720;
+  const sign = minutes < 0 ? "-" : "+";
+  const absoluteMinutes = Math.abs(minutes);
+  const hours = Math.floor(absoluteMinutes / 60);
+  const remainingMinutes = absoluteMinutes % 60;
+  const minuteSuffix =
+    remainingMinutes === 0 ? "" : `:${String(remainingMinutes).padStart(2, "0")}`;
+  return `UTC${sign}${hours}${minuteSuffix}`;
 }
 
 /** Formats shared UTC ranges as local clock times for each valid working zone. */

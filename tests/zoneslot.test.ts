@@ -36,7 +36,9 @@ function renderedCells(date: string, zone: string, from: number, to: number) {
       initialHash: `#d=${date}&z=${zone}@${from}-${to}`,
     }),
   );
-  const row = markup.match(new RegExp(`<tr><th scope="row">${zone}</th>(.*?)</tr>`))?.[1];
+  const row = markup.match(
+    new RegExp(`<tr><th scope="row">${zone}<span class="zone-offset">[^<]*</span></th>(.*?)</tr>`),
+  )?.[1];
   return [...(row ?? "").matchAll(/<td([^>]*)>([^<]*)<\/td>/g)].map(([, attributes, text]) => ({
     attributes,
     text,
@@ -439,7 +441,11 @@ describe("server-rendered components", () => {
     const checkboxOn =
       '<label class="weekend-control"><input type="checkbox" checked=""/><span>Skip weekends</span></label>';
     const row = (markup: string, zone: string) =>
-      markup.match(new RegExp(`<tr><th scope="row">${zone}</th>(.*?)</tr>`))?.[1] ?? "";
+      markup.match(
+        new RegExp(
+          `<tr><th scope="row">${zone}<span class="zone-offset">[^<]*</span></th>(.*?)</tr>`,
+        ),
+      )?.[1] ?? "";
     const workingCells = (markup: string, zone: string) =>
       row(markup, zone).match(/data-state="work"/g)?.length ?? 0;
 
