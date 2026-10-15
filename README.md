@@ -83,6 +83,10 @@ No common working hours on 2026-03-14 (UTC)
 
 Without `w=1`, the same zones give `All 2 zones overlap: 00:00-04:00 UTC`.
 
+### UTC offsets
+
+The row header of each zone shows the zone's offset from UTC on the chosen date, measured at 12:00 UTC: `UTC+1`, `UTC-4`, `UTC+5:30`, `UTC+0`. Hours have no leading zero, and the minutes appear only when they are not 0. Because the offset follows the date, Berlin reads `UTC+1` on 2026-03-10 and `UTC+2` on 2026-03-29, the day daylight saving starts.
+
 ## Development
 
 ```sh

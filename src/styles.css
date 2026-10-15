@@ -268,6 +268,13 @@ h1 {
   font-weight: 600;
 }
 
+.zone-offset {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
 .hours-grid td {
   color: #839088;
   font-family: "DM Mono", monospace;
